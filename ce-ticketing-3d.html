@@ -1,0 +1,963 @@
+<!DOCTYPE html>
+<html lang="es" class="h-full">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CoverExperiences · Ticketing 3D</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<script>
+  tailwind.config = {
+    theme: { extend: {
+      colors: {
+        brand: { 50:'#ffefcf',100:'#ffe9bd',200:'#ffda91',300:'#ffc34d',400:'#ffb521',500:'#ffaa00',600:'#d68f00',700:'#9e6a00' },
+        accent:{ 500:'#ffaa00',600:'#d68f00' }
+      },
+      fontFamily: { sans: ['Inter','system-ui','sans-serif'] },
+      boxShadow: { 'brand':'0 10px 30px -10px rgba(79,70,229,.35)', 'card':'0 1px 2px rgba(15,23,42,.06), 0 8px 24px -12px rgba(15,23,42,.12)' }
+    }}
+  }
+</script>
+<style>
+  html,body{background:#f6f7fb;color:#1e293b;font-family:Inter,system-ui,sans-serif}
+  ::-webkit-scrollbar{width:9px;height:9px}
+  ::-webkit-scrollbar-track{background:#eef1f7}
+  ::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:3px}
+  ::-webkit-scrollbar-thumb:hover{background:#94a3b8}
+  .glass{background:rgba(255,255,255,.85);backdrop-filter:blur(14px);border:1px solid #e2e8f0}
+  .fade-in{animation:fade .35s ease both}
+  @keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+  .view{display:none}.view.active{display:flex}
+  .num-pill{font-variant-numeric:tabular-nums}
+  .cf-input{width:100%;margin-top:.25rem;background:#fff;border:1px solid #cbd5e1;border-radius:.3rem;padding:.6rem .75rem;font-size:.875rem;color:#0f172a;outline:none;transition:border-color .2s,box-shadow .2s}
+  .cf-input:focus{border-color:#6366f1;box-shadow:0 0 0 3px rgba(99,102,241,.15)}
+  .break-avoid{break-inside:avoid}
+</style>
+</head>
+<body class="h-full overflow-hidden flex flex-col">
+
+<!-- LOADER -->
+<div id="loader" class="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-white transition-opacity duration-500">
+  <div class="w-16 h-16 border-4 border-brand-500 border-t-transparent rounded-full animate-spin"></div>
+  <p class="mt-5 text-sm tracking-[0.3em] text-brand-600 font-semibold">COVEREXPERIENCES</p>
+  <p class="text-xs text-slate-400 mt-1">Cargando experiencias…</p>
+</div>
+
+<!-- TOP BAR -->
+<header class="glass shrink-0 h-16 px-4 md:px-8 flex items-center justify-between z-30">
+  <button onclick="App.goEvents()" class="flex items-center gap-3">
+    <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-brand-500 to-accent-500 flex items-center justify-center shadow-brand"><i class="fa-solid fa-ticket text-white"></i></div>
+    <div class="text-left"><p class="font-extrabold tracking-tight text-slate-900 leading-none">CoverExperiences</p><p class="text-[10px] text-slate-400 leading-none mt-0.5">Ticketing & Seat Map 3D</p></div>
+  </button>
+  <div class="flex items-center gap-3">
+    <span id="topbar-event" class="hidden md:inline text-xs text-slate-500 max-w-[260px] truncate"></span>
+    <button onclick="App.openCart()" class="relative px-3 h-10 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-200 flex items-center gap-2 transition">
+      <i class="fa-solid fa-cart-shopping text-brand-600"></i><span class="text-sm font-semibold text-slate-700">Carrito</span>
+      <span id="cart-count" class="num-pill min-w-[20px] h-5 px-1 rounded-full bg-brand-600 text-white text-[11px] font-bold flex items-center justify-center">0</span>
+    </button>
+  </div>
+</header>
+
+<!-- VIEW: EVENTS -->
+<main id="view-events" class="view active flex-1 overflow-y-auto">
+  <div class="w-full max-w-6xl mx-auto px-5 md:px-8 py-10">
+    <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8">
+      <div>
+        <p class="text-brand-600 text-xs font-bold tracking-[0.25em] uppercase mb-2">Próximas experiencias</p>
+        <h1 class="text-3xl md:text-4xl font-black text-slate-900">Elige tu evento</h1>
+      </div>
+      <div class="inline-flex bg-slate-100 rounded-xl p-1 self-start sm:self-auto">
+        <button id="vt-calendar" onclick="App.setEventsView('calendar')" class="px-3 py-1.5 text-xs font-semibold rounded-lg transition"><i class="fa-regular fa-calendar mr-1.5"></i>Calendario</button>
+        <button id="vt-grid" onclick="App.setEventsView('grid')" class="px-3 py-1.5 text-xs font-semibold rounded-lg transition"><i class="fa-solid fa-table-cells-large mr-1.5"></i>Cuadrícula</button>
+      </div>
+    </div>
+
+    <!-- Calendar -->
+    <div id="events-calendar">
+      <div class="flex items-center justify-between mb-4">
+        <h2 id="cal-title" class="text-lg font-bold text-slate-900 capitalize"></h2>
+        <div class="flex gap-2">
+          <button onclick="App.calPrev()" class="w-9 h-9 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 text-slate-600"><i class="fa-solid fa-chevron-left"></i></button>
+          <button onclick="App.calNext()" class="w-9 h-9 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 text-slate-600"><i class="fa-solid fa-chevron-right"></i></button>
+        </div>
+      </div>
+      <div class="grid grid-cols-7 gap-px bg-slate-200 rounded-t-xl overflow-hidden text-center">
+        <div class="bg-slate-50 py-2 text-[11px] font-bold text-slate-500">LUN</div><div class="bg-slate-50 py-2 text-[11px] font-bold text-slate-500">MAR</div><div class="bg-slate-50 py-2 text-[11px] font-bold text-slate-500">MIÉ</div><div class="bg-slate-50 py-2 text-[11px] font-bold text-slate-500">JUE</div><div class="bg-slate-50 py-2 text-[11px] font-bold text-slate-500">VIE</div><div class="bg-slate-50 py-2 text-[11px] font-bold text-slate-500">SÁB</div><div class="bg-slate-50 py-2 text-[11px] font-bold text-slate-500">DOM</div>
+      </div>
+      <div id="cal-grid" class="grid grid-cols-7 gap-px bg-slate-200 rounded-b-xl overflow-hidden"></div>
+    </div>
+
+    <!-- Masonry -->
+    <div id="events-masonry" class="columns-1 sm:columns-2 lg:columns-3 gap-5"></div>
+
+    <p class="text-center text-xs text-slate-400 mt-10">Demo de producto · CoverExperiences · datos simulados</p>
+  </div>
+</main>
+
+<!-- VIEW: FUNNEL -->
+<main id="view-funnel" class="view flex-1 flex-col overflow-hidden">
+  <div class="glass shrink-0 px-4 md:px-8 py-3 flex items-center justify-between gap-4">
+    <button onclick="App.goEvents()" class="text-xs text-slate-500 hover:text-slate-900 flex items-center gap-1.5 shrink-0"><i class="fa-solid fa-arrow-left"></i><span class="hidden sm:inline">Eventos</span></button>
+    <ol id="stepper" class="flex items-center gap-2 md:gap-4 mx-auto"></ol>
+    <div class="w-16 shrink-0 text-right"><span class="text-[11px] text-slate-400">Total</span><p id="stepper-total" class="num-pill text-sm font-bold text-slate-900 leading-none">0 €</p></div>
+  </div>
+
+  <div class="flex-1 overflow-hidden relative">
+    <!-- STEP 1 -->
+    <section id="step-1" class="absolute inset-0 flex flex-col lg:flex-row overflow-hidden">
+      <div id="plan-area" class="flex-1 h-1/2 lg:h-full relative bg-slate-100 border-b lg:border-b-0 lg:border-r border-slate-200">
+        <div id="plan-canvas" class="absolute inset-0"></div>
+        <div class="absolute top-3 left-3 right-3 flex flex-wrap gap-1.5 pointer-events-auto"><div id="plan-floors" class="flex flex-wrap gap-1.5 glass rounded-xl p-1.5 shadow-card"></div></div>
+        <div class="absolute bottom-3 left-3 glass rounded-xl p-3 text-[11px] space-y-1.5 max-w-[230px] pointer-events-none shadow-card">
+          <p class="font-bold text-slate-700 mb-1"><i class="fa-solid fa-circle-info text-brand-600 mr-1"></i> Leyenda</p>
+          <div class="flex items-center gap-2"><span class="w-3 h-3 rounded bg-slate-300 block"></span><span class="text-slate-500">Disponible</span></div>
+          <div class="flex items-center gap-2"><span class="w-3 h-3 rounded bg-brand-500 block"></span><span class="text-slate-500">En tu carrito</span></div>
+          <div class="flex items-center gap-2"><span class="w-3 h-3 rounded bg-slate-400 block"></span><span class="text-slate-500">No disponible</span></div>
+          <p class="text-[10px] text-slate-400 pt-1 border-t border-slate-200"><i class="fa-solid fa-hand-pointer mr-1"></i>Clic en mesa: ver ficha · Clic fuera: volver</p>
+        </div>
+        <div id="plan-empty" class="hidden absolute inset-0 flex items-center justify-center text-center px-6">
+          <div><i class="fa-solid fa-people-group text-4xl text-slate-300 mb-3"></i><p class="text-slate-600 font-semibold">Este evento es solo de entrada general</p><p class="text-slate-400 text-sm mt-1">Selecciona tus entradas en el panel de la derecha.</p></div>
+        </div>
+      </div>
+      <aside class="w-full lg:w-[420px] h-1/2 lg:h-full bg-white border-l border-slate-200 flex flex-col shrink-0">
+        <button id="event-info-bar" onclick="App.openEventModal()" class="shrink-0 w-full text-left border-b border-slate-200 p-4 hover:bg-slate-50 transition"></button>
+        <div id="sidebar-content" class="flex-1 flex flex-col overflow-hidden"></div>
+      </aside>
+    </section>
+
+    <!-- STEP 2 -->
+    <section id="step-2" class="absolute inset-0 hidden overflow-y-auto">
+      <div class="w-full max-w-4xl mx-auto px-5 py-8 grid grid-cols-1 lg:grid-cols-5 gap-8">
+        <form id="customer-form" class="lg:col-span-3 space-y-5" onsubmit="return false">
+          <div><h2 class="text-2xl font-black text-slate-900">Tus datos</h2><p class="text-slate-500 text-sm mt-1">Necesarios para emitir las entradas.</p></div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <label class="block"><span class="text-xs text-slate-500 font-semibold">Nombre*</span><input name="firstName" class="cf-input" placeholder="Alejandra"></label>
+            <label class="block"><span class="text-xs text-slate-500 font-semibold">Apellidos*</span><input name="lastName" class="cf-input" placeholder="Silva"></label>
+          </div>
+          <label class="block"><span class="text-xs text-slate-500 font-semibold">Email*</span><input name="email" type="email" class="cf-input" placeholder="alejandra@email.com"></label>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <label class="block"><span class="text-xs text-slate-500 font-semibold">Teléfono*</span><input name="phone" class="cf-input" placeholder="+34 600 000 000"></label>
+            <label class="block"><span class="text-xs text-slate-500 font-semibold">País</span><select name="country" class="cf-input"><option>España</option><option>Portugal</option><option>Francia</option><option>Italia</option><option>Reino Unido</option><option>Otro</option></select></label>
+          </div>
+          <label class="block"><span class="text-xs text-slate-500 font-semibold">Comentarios para el local (opcional)</span><textarea name="notes" rows="2" class="cf-input" placeholder="Alergias, ocasión especial, etc."></textarea></label>
+          <label class="flex items-start gap-2 text-xs text-slate-500"><input type="checkbox" name="terms" class="mt-0.5 accent-brand-600"> Acepto las condiciones de compra y la política de privacidad.*</label>
+          <p id="cf-error" class="hidden text-xs text-rose-500"><i class="fa-solid fa-circle-exclamation mr-1"></i>Revisa los campos obligatorios.</p>
+          <div class="flex flex-col sm:flex-row gap-3 pt-2">
+            <button onclick="App.goStep(1)" type="button" class="sm:w-44 py-3 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 font-bold text-sm transition"><i class="fa-solid fa-arrow-left mr-1"></i> Seguir comprando</button>
+            <button onclick="App.placeOrder()" type="button" class="flex-1 py-3 rounded-xl bg-gradient-to-r from-brand-500 to-brand-600 hover:brightness-105 text-white font-bold text-sm transition shadow-brand"><i class="fa-solid fa-lock mr-1.5"></i> Pagar <span id="pay-total"></span></button>
+          </div>
+        </form>
+        <aside class="lg:col-span-2">
+          <div class="bg-white border border-slate-200 shadow-card rounded-2xl p-5 lg:sticky lg:top-4">
+            <h3 class="text-sm font-bold text-slate-900 mb-3">Resumen del pedido</h3>
+            <div id="order-summary" class="space-y-2 text-sm max-h-[40vh] overflow-y-auto pr-1"></div>
+            <div class="border-t border-slate-200 mt-4 pt-3 space-y-1.5 text-sm">
+              <div class="flex justify-between text-slate-500"><span>Subtotal</span><span id="os-subtotal" class="num-pill">0 €</span></div>
+              <div class="flex justify-between text-slate-500"><span>Gastos de gestión (5%)</span><span id="os-fee" class="num-pill">0 €</span></div>
+              <div class="flex justify-between text-slate-900 font-black text-lg pt-1"><span>Total</span><span id="os-total" class="num-pill">0 €</span></div>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </section>
+  </div>
+</main>
+
+<!-- VIEW: CONFIRMATION -->
+<main id="view-confirmation" class="view flex-1 overflow-y-auto">
+  <div class="w-full max-w-lg mx-auto px-5 py-16 text-center fade-in">
+    <div class="w-20 h-20 rounded-full bg-brand-100 border border-brand-300 flex items-center justify-center mx-auto mb-6"><i class="fa-solid fa-check text-3xl text-brand-600"></i></div>
+    <h1 class="text-3xl font-black text-slate-900">¡Compra confirmada!</h1>
+    <p class="text-slate-500 mt-2">Hemos enviado tus entradas a <span id="conf-email" class="text-brand-600 font-semibold"></span>.</p>
+    <div class="bg-white border border-slate-200 shadow-card rounded-2xl p-5 mt-8 text-left">
+      <div class="flex justify-between text-sm mb-3 pb-3 border-b border-slate-200"><span class="text-slate-500">Localizador</span><span id="conf-id" class="num-pill font-mono font-bold text-slate-900"></span></div>
+      <div id="conf-summary" class="space-y-2 text-sm"></div>
+      <div class="flex justify-between text-slate-900 font-black text-lg mt-4 pt-3 border-t border-slate-200"><span>Total pagado</span><span id="conf-total" class="num-pill"></span></div>
+    </div>
+    <button onclick="App.goEvents()" class="mt-8 px-6 py-3 rounded-xl bg-gradient-to-r from-brand-500 to-accent-500 hover:brightness-105 text-white font-bold text-sm transition shadow-brand">Volver a eventos</button>
+  </div>
+</main>
+
+<!-- EVENT MODAL -->
+<div id="event-modal" class="fixed inset-0 z-[55] hidden items-center justify-center p-4">
+  <div class="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onclick="App.closeEventModal()"></div>
+  <div class="relative bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[88vh] overflow-hidden grid grid-cols-1 md:grid-cols-2 fade-in">
+    <div id="em-flyer-wrap" class="relative min-h-[260px] md:min-h-full">
+      <img id="em-flyer" class="absolute inset-0 w-full h-full object-cover" alt="" onerror="this.style.display='none'">
+    </div>
+    <div class="p-6 md:p-8 overflow-y-auto max-h-[88vh] relative">
+      <button onclick="App.closeEventModal()" class="absolute top-4 right-4 w-9 h-9 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-500"><i class="fa-solid fa-xmark"></i></button>
+      <p id="em-date" class="text-sm text-slate-500 font-semibold"></p>
+      <h2 id="em-name" class="text-3xl font-black text-slate-900 mt-1 leading-tight pr-10"></h2>
+      <div id="em-tags" class="flex flex-wrap gap-2 mt-4"></div>
+      <h4 class="text-xs font-bold tracking-widest text-brand-600 uppercase mt-7 mb-2 flex items-center gap-2"><span class="w-1 h-4 bg-brand-500 rounded"></span>Información</h4>
+      <div id="em-info" class="text-sm text-slate-600 leading-relaxed"></div>
+      <h4 class="text-xs font-bold tracking-widest text-brand-600 uppercase mt-6 mb-2 flex items-center gap-2"><span class="w-1 h-4 bg-brand-500 rounded"></span>Ubicación</h4>
+      <p id="em-venue" class="text-sm font-semibold text-slate-800"></p>
+      <p id="em-address" class="text-sm text-slate-500"></p>
+      <a id="em-maps" target="_blank" rel="noopener" class="inline-flex items-center gap-1.5 text-sm text-brand-600 font-semibold mt-1 hover:underline">Ver en Google Maps <i class="fa-solid fa-arrow-up-right-from-square text-[11px]"></i></a>
+      <button onclick="App.closeEventModal()" class="w-full py-3 rounded-xl bg-gradient-to-r from-brand-500 to-accent-500 text-white font-bold text-sm hover:brightness-105 transition mt-7">Comprar entradas <i class="fa-solid fa-arrow-right ml-1"></i></button>
+    </div>
+  </div>
+</div>
+
+<!-- CART DRAWER -->
+<div id="cart-overlay" class="fixed inset-0 z-40 bg-slate-900/30 backdrop-blur-sm opacity-0 pointer-events-none transition-opacity" onclick="App.closeCart()"></div>
+<aside id="cart-drawer" class="fixed top-0 right-0 h-full w-full max-w-md z-50 bg-white border-l border-slate-200 shadow-2xl flex flex-col translate-x-full transition-transform duration-300">
+  <div class="flex items-center justify-between p-5 border-b border-slate-200 shrink-0"><h3 class="font-bold text-slate-900"><i class="fa-solid fa-cart-shopping text-brand-600 mr-2"></i>Tu carrito</h3><button onclick="App.closeCart()" class="w-8 h-8 rounded-lg hover:bg-slate-100 text-slate-400"><i class="fa-solid fa-xmark"></i></button></div>
+  <div id="drawer-items" class="flex-1 overflow-y-auto p-5 space-y-3"></div>
+  <div class="shrink-0 border-t border-slate-200 p-5 bg-slate-50">
+    <div class="flex justify-between text-slate-900 font-black text-lg mb-3"><span>Total</span><span id="drawer-total" class="num-pill">0 €</span></div>
+    <button id="drawer-checkout" onclick="App.closeCart(); App.goStep(2)" class="w-full py-3 rounded-xl bg-gradient-to-r from-brand-500 to-brand-600 text-white font-bold text-sm mb-2 hover:brightness-105 transition">Ir al pago</button>
+    <button onclick="App.closeCart()" class="w-full py-2.5 rounded-xl bg-slate-100 border border-slate-200 text-slate-600 font-semibold text-sm">Seguir comprando</button>
+  </div>
+</aside>
+
+<div id="toast" class="fixed bottom-5 left-1/2 -translate-x-1/2 z-[60] px-4 py-2.5 rounded-xl bg-slate-900 text-white text-sm font-semibold shadow-lg opacity-0 pointer-events-none transition-opacity"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
+<script>
+const PLAN_BEACH = {
+  meta:{venueType:"beach"},
+  floors:{ "56187":{id_floor:"56187",name:"Dance"},"56188":{id_floor:"56188",name:"Back"},"56189":{id_floor:"56189",name:"Main Big"},"56190":{id_floor:"56190",name:"Main Small"},"56191":{id_floor:"56191",name:"Sky"},"62437":{id_floor:"62437",name:"Sotogrande"} },
+  zones:{ "88247":{id_zone:"88247",name:"Dance Floor",floor:"56187"},"88248":{id_zone:"88248",name:"Back Stage",floor:"56188"},"88249":{id_zone:"88249",name:"Main Floor Big",floor:"56189"},"88250":{id_zone:"88250",name:"Main Floor Small",floor:"56190"},"88251":{id_zone:"88251",name:"Sky Box",floor:"56191"},"98163":{id_zone:"98163",name:"CHAMBAO",floor:"62437"} },
+  tables:{
+    "11":{id_table:11,max:"12",min:"1",id_zone:"88247",x:"112",y:"92",shape:"cuadrada"},"12":{id_table:12,max:"7",min:"1",id_zone:"88247",x:"109",y:"199",shape:"cuadrada"},"13":{id_table:13,max:"12",min:"1",id_zone:"88247",x:"236",y:"95",shape:"cuadrada"},"14":{id_table:14,max:"7",min:"1",id_zone:"88247",x:"238",y:"201",shape:"cuadrada"},"15":{id_table:15,max:"7",min:"1",id_zone:"88247",x:"174",y:"292",shape:"cuadrada"},"16":{id_table:16,max:"13",min:"1",id_zone:"88247",x:"485",y:"87",shape:"cuadrada"},"17":{id_table:17,max:"12",min:"1",id_zone:"88247",x:"612",y:"89",shape:"cuadrada"},"18":{id_table:18,max:"7",min:"1",id_zone:"88247",x:"486",y:"198",shape:"cuadrada"},"19":{id_table:19,max:"7",min:"1",id_zone:"88247",x:"615",y:"202",shape:"cuadrada"},"20":{id_table:20,max:"7",min:"1",id_zone:"88247",x:"551",y:"295",shape:"cuadrada"},
+    "25":{id_table:25,max:"7",min:"1",id_zone:"88248",x:"136",y:"210",shape:"alargadah"},"40":{id_table:40,max:"7",min:"1",id_zone:"88248",x:"401",y:"212",shape:"alargadah"},"41":{id_table:41,max:"7",min:"1",id_zone:"88248",x:"669",y:"213",shape:"alargadah"},"48":{id_table:48,max:"7",min:"1",id_zone:"88248",x:"265",y:"323",shape:"alargadah"},"49":{id_table:49,max:"7",min:"1",id_zone:"88248",x:"546",y:"326",shape:"alargadah"},
+    "27":{id_table:27,max:"7",min:"1",id_zone:"88249",x:"201",y:"121",shape:"redonda"},"28":{id_table:28,max:"7",min:"1",id_zone:"88249",x:"203",y:"210",shape:"redonda"},"29":{id_table:29,max:"7",min:"1",id_zone:"88249",x:"201",y:"307",shape:"redonda"},"30":{id_table:30,max:"7",min:"1",id_zone:"88249",x:"570",y:"111",shape:"redonda"},"31":{id_table:31,max:"7",min:"1",id_zone:"88249",x:"572",y:"205",shape:"redonda"},"32":{id_table:32,max:"7",min:"1",id_zone:"88249",x:"574",y:"302",shape:"redonda"},"33":{id_table:33,max:"7",min:"1",id_zone:"88249",x:"204",y:"395",shape:"redonda"},"34":{id_table:34,max:"7",min:"1",id_zone:"88249",x:"578",y:"395",shape:"redonda"},"43":{id_table:43,max:"7",min:"1",id_zone:"88249",x:"203",y:"29",shape:"redonda"},"44":{id_table:44,max:"7",min:"1",id_zone:"88249",x:"567",y:"31",shape:"redonda"},
+    "35":{id_table:35,max:"7",min:"1",id_zone:"88250",x:"395",y:"206",shape:"alargadah"},"50":{id_table:50,max:"7",min:"1",id_zone:"88250",x:"212",y:"93",shape:"alargadah"},"51":{id_table:51,max:"7",min:"1",id_zone:"88250",x:"575",y:"94",shape:"alargadah"},"52":{id_table:52,max:"7",min:"1",id_zone:"88250",x:"221",y:"333",shape:"alargadah"},"53":{id_table:53,max:"7",min:"1",id_zone:"88250",x:"575",y:"333",shape:"alargadah"},
+    "36":{id_table:36,max:"7",min:"1",id_zone:"88251",x:"134",y:"226",shape:"alargadah"},"37":{id_table:37,max:"7",min:"1",id_zone:"88251",x:"281",y:"226",shape:"alargadah"},"38":{id_table:38,max:"7",min:"1",id_zone:"88251",x:"525",y:"219",shape:"alargadah"},"39":{id_table:39,max:"7",min:"1",id_zone:"88251",x:"669",y:"220",shape:"alargadah"},"54":{id_table:54,max:"7",min:"1",id_zone:"88251",x:"399",y:"141",shape:"alargadah"},
+    "56":{id_table:56,max:"6",min:"1",id_zone:"98163",x:"166",y:"124",shape:"alargadav"},"57":{id_table:57,max:"6",min:"1",id_zone:"98163",x:"297",y:"119",shape:"alargadav"},"58":{id_table:58,max:"6",min:"1",id_zone:"98163",x:"437",y:"122",shape:"alargadav"},"59":{id_table:59,max:"6",min:"1",id_zone:"98163",x:"595",y:"119",shape:"alargadav"},"60":{id_table:60,max:"6",min:"1",id_zone:"98163",x:"217",y:"323",shape:"alargadav"},"61":{id_table:61,max:"6",min:"1",id_zone:"98163",x:"375",y:"326",shape:"alargadav"},"62":{id_table:62,max:"6",min:"1",id_zone:"98163",x:"539",y:"314",shape:"alargadav"}
+  },
+  combinations:[],
+  roomelements:{
+    "317993":{x:"379",y:"62",h:"40",w:"40",shape:"palm",floor:"56187"},"317996":{x:"378",y:"371",h:"40",w:"40",shape:"palm",floor:"56187"},"318005":{x:"167",y:"132",h:"40",w:"40",shape:"palm",floor:"56188"},
+    "318010":{x:"330",y:"79",h:"337",w:"179",shape:"pool-v",floor:"56189"},"318012":{x:"449",y:"31",h:"40",w:"40",shape:"umbrella-1",floor:"56189"},"318016":{x:"312",y:"144",h:"187",w:"256",shape:"other",floor:"56190"},
+    "318021":{x:"434",y:"230",h:"40",w:"40",shape:"plant",floor:"56191"},"344616":{x:"205",y:"60",h:"68",w:"70",shape:"umbrella-1",floor:"62437"},"344618":{x:"284",y:"275",h:"66",w:"70",shape:"umbrella-2",floor:"62437"}
+  }
+};
+const PLAN_ROOFTOP = {
+  meta:{venueType:"club"},
+  floors:{ "700":{id_floor:"700",name:"Rooftop"},"701":{id_floor:"701",name:"Main Room"} },
+  zones:{ "900":{id_zone:"900",name:"Skyline Terrace",floor:"700"},"901":{id_zone:"901",name:"VIP Pit",floor:"701"},"902":{id_zone:"902",name:"Stage Booths",floor:"701"} },
+  tables:{
+    "1":{id_table:1,max:"6",min:"1",id_zone:"900",x:"120",y:"110",shape:"redonda"},"2":{id_table:2,max:"6",min:"1",id_zone:"900",x:"260",y:"110",shape:"redonda"},"3":{id_table:3,max:"6",min:"1",id_zone:"900",x:"400",y:"110",shape:"redonda"},
+    "4":{id_table:4,max:"10",min:"1",id_zone:"901",x:"150",y:"300",shape:"cuadrada"},"5":{id_table:5,max:"10",min:"1",id_zone:"901",x:"320",y:"300",shape:"cuadrada"},
+    "6":{id_table:6,max:"8",min:"1",id_zone:"902",x:"500",y:"290",shape:"alargadah"},"7":{id_table:7,max:"8",min:"1",id_zone:"902",x:"500",y:"360",shape:"alargadah"}
+  },
+  combinations:[],
+  roomelements:{ "1001":{x:"300",y:"200",h:"60",w:"160",shape:"pool-v",floor:"700"},"1002":{x:"60",y:"60",h:"40",w:"40",shape:"plant",floor:"700"},"1004":{x:"300",y:"120",h:"120",w:"200",shape:"other",floor:"701"} }
+};
+
+const EVENTS = [
+  { id:"balearic-opening", name:"Balearic Beach Club · Opening Party", venue:"Ibiza · Platja d'en Bossa", date:"Sáb 27 jun 2026 · 16:00", dateISO:"2026-06-27T16:00", accent:"from-amber-500 to-rose-500", icon:"fa-umbrella-beach",
+    tagline:"Sunset session con line-up internacional. Camas balinesas y reservados frente al mar.",
+    flyer:"https://picsum.photos/seed/balearic-beach/800/1100",
+    titleBig:"OPENING PARTY", dateLong:"Sábado, 27 de junio 2026 · 16:00 — CIERRE",
+    tags:[{label:"+18"},{icon:"fa-umbrella-beach",label:"Beach club"},{icon:"fa-music",label:"House"},{icon:"fa-music",label:"Sunset"}],
+    info:"¡DESPIERTA TU LADO MÁS LIBRE! 🌅\nEste sábado 27 de junio, el Balearic Beach Club abre temporada con una sunset session de altura: line-up internacional, camas balinesas a pie de arena y reservados frente al mar.\nDeja atrás la rutina y vive una jornada legendaria desde el atardecer hasta el cierre.",
+    address:"Platja d'en Bossa, 07817 Sant Josep de sa Talaia, Ibiza, España",
+    mapsUrl:"https://www.google.com/maps/search/?api=1&query=Platja%20d'en%20Bossa%20Ibiza",
+    plan:PLAN_BEACH, soldTables:[11,28,38,56],
+    zonePricing:{ "88247":{label:"Cama VIP · Dance Floor",description:"Cama balinesa frente a cabina con servicio dedicado y vistas a pista.",cover:25,minSpend:1200,prepay:300}, "88248":{label:"Reservado · Back Stage",description:"Zona reservada tras el escenario, máxima privacidad para grupos.",cover:20,minSpend:800,prepay:200}, "88249":{label:"Cama VIP · Main Big",description:"Cama amplia en la pista principal con vistas al mar.",cover:20,minSpend:1000,prepay:250}, "88250":{label:"Cama VIP · Main Small",description:"Cama doble en zona principal, ambiente relajado.",cover:18,minSpend:900,prepay:220}, "88251":{label:"Sky Box · Reservado",description:"Reservado elevado premium con botellero y camarero propio.",cover:35,minSpend:1500,prepay:400}, "98163":{label:"Chambao · Sotogrande",description:"Chill out a pie de arena, el espacio más exclusivo del club.",cover:30,minSpend:950,prepay:240} },
+    generalTickets:[ {id:"ga-early",name:"Early Bird",desc:"Aforo limitado. Acceso general a precio reducido.",price:30,max:10}, {id:"ga",name:"Entrada General",desc:"Acceso a la zona común del beach club.",price:45,max:10}, {id:"ga-prem",name:"General Premium",desc:"Acceso prioritario sin cola + welcome drink.",price:75,max:10} ],
+    addons:[ {id:"bottle",name:"Botella Premium (Vodka 70cl)",desc:"Servicio en mesa con mixers",price:180,max:5}, {id:"cava",name:"Pack Cava de bienvenida",desc:"Botella + 6 copas",price:60,max:5}, {id:"park",name:"Parking VIP",desc:"Plaza reservada",price:25,max:4}, {id:"transfer",name:"Transfer al puerto",desc:"Ida y vuelta",price:40,max:8} ] },
+  { id:"skyline-night", name:"Skyline Rooftop · Friday Night", venue:"Madrid · Gran Vía", date:"Vie 17 jul 2026 · 23:00", dateISO:"2026-07-17T23:00", accent:"from-indigo-500 to-fuchsia-500", icon:"fa-champagne-glasses",
+    tagline:"Terraza panorámica y club. Reservados de pista y booths frente al escenario.",
+    flyer:"https://picsum.photos/seed/skyline-night/800/1100",
+    titleBig:"FRIDAY NIGHT", dateLong:"Viernes, 17 de julio 2026 · 23:00 — CIERRE",
+    tags:[{label:"+18"},{icon:"fa-shirt",label:"Arreglado"},{icon:"fa-music",label:"Comercial"},{icon:"fa-music",label:"Reggaeton"}],
+    info:"La noche de los viernes en lo más alto de Madrid. 🌃\nTerraza panorámica con vistas a Gran Vía y club en la planta principal: reservados de pista junto a cabina y booths frente al escenario.\nMúsica comercial y reggaeton hasta el cierre.",
+    address:"Gran Vía, 28013 Madrid, España",
+    mapsUrl:"https://www.google.com/maps/search/?api=1&query=Gran%20Via%20Madrid",
+    plan:PLAN_ROOFTOP, soldTables:[2,5],
+    zonePricing:{ "900":{label:"Terraza · Skyline",description:"Mesa alta en terraza panorámica con vistas a la ciudad.",cover:20,minSpend:450,prepay:120}, "901":{label:"VIP Pit · Pista",description:"Reservado en pista, junto a cabina del DJ.",cover:25,minSpend:700,prepay:180}, "902":{label:"Booth · Escenario",description:"Booth elevado frente al escenario principal.",cover:25,minSpend:600,prepay:150} },
+    generalTickets:[ {id:"ga",name:"Entrada General",desc:"Acceso a club + terraza.",price:25,max:12}, {id:"ga-list",name:"Lista reducida (antes 01:00)",desc:"Acceso con descuento entrando temprano.",price:15,max:12} ],
+    addons:[ {id:"bottle",name:"Botella + mesa de pie",desc:"Para grupos",price:150,max:6}, {id:"coat",name:"Guardarropa",desc:"Por persona",price:5,max:12} ] },
+  { id:"sunset-festival", name:"Sunset Festival · Day 1", venue:"Valencia · La Marina", date:"Sáb 8 ago 2026 · 18:00", dateISO:"2026-08-08T18:00", accent:"from-brand-500 to-cyan-500", icon:"fa-music",
+    tagline:"Festival de acceso general, sin plano de reservados. Solo entradas por tipo.",
+    flyer:"https://picsum.photos/seed/sunset-festival/800/1100",
+    titleBig:"SUNSET FESTIVAL · DÍA 1", dateLong:"Sábado, 8 de agosto 2026 · 18:00 — 06:00",
+    tags:[{label:"+18"},{icon:"fa-music",label:"Electronic"},{icon:"fa-music",label:"Live"},{icon:"fa-water",label:"Beachfront"}],
+    info:"Primera jornada del Sunset Festival a pie de mar. 🎶\nFestival de acceso general (sin reservados): elige tu tipo de entrada y disfruta del cartel completo.\nAbono de día, VIP Pass y Premium con zonas exclusivas disponibles.",
+    address:"La Marina de València, 46024 València, España",
+    mapsUrl:"https://www.google.com/maps/search/?api=1&query=La%20Marina%20de%20Valencia",
+    plan:null, soldTables:[], zonePricing:{},
+    generalTickets:[ {id:"day1",name:"Abono Día 1",desc:"Acceso general a la jornada 1.",price:55,max:10}, {id:"day1-vip",name:"Día 1 · VIP Pass",desc:"Zona elevada + barra exclusiva.",price:120,max:10}, {id:"day1-premium",name:"Día 1 · Premium",desc:"Front stage + lounge privado.",price:180,max:6} ],
+    addons:[ {id:"locker",name:"Taquilla",desc:"Disponible todo el día",price:10,max:6}, {id:"glass",name:"Vaso reutilizable oficial",desc:"Edición festival",price:8,max:10}, {id:"camp",name:"Pase camping",desc:"1 noche",price:35,max:6} ] }
+];
+</script>
+
+<script>
+
+  /* ====================================================================== */
+/* PlanRenderer — escena 3D estilo beach club, una sola planta (no stacked) */
+/* Pin de precio por MESA · highlight on hover · focus+zoom a la mesa        */
+/* ====================================================================== */
+const PlanRenderer = (function () {
+  let scene, camera, renderer, controls, raycaster, mouse, rafId;
+  let container, plan, opts;
+  let tableMeshes = [], elementMeshes = [], floorObjs = [], waters = [], pins = [];
+  let currentFloor = null, hovered = null, resizeHandler, focusedId = null, defaultCam = null;
+  let SCALE, OFFSET_X, OFFSET_Z;
+
+  /* Paleta beach club (light) */
+  const COL = {
+    bg:0xdcecf2, sand:0xe8dcc3, sandLine:0xcdb98f, wood:0xb07d46,
+    available:0xf4ede1, selected:0x6366f1, booked:0x10b981, sold:0xcabfa6,
+    pillow:0xdac9ab, water:0x2bbdcf, palmLeaf:0x3f9e6f, trunk:0x7d5b3a,
+    fabric1:0xfbf6ec, fabric2:0xe9795f, stage:0xcdb89a
+  };
+
+  function computeBounds() {
+    let maxX = 600, maxY = 400;
+    Object.values(plan.tables).forEach(t => { if (plan.zones[t.id_zone].floor !== currentFloor) return; maxX = Math.max(maxX, +t.x + 60); maxY = Math.max(maxY, +t.y + 60); });
+    Object.values(plan.roomelements || {}).forEach(e => { if (e.floor !== currentFloor) return; maxX = Math.max(maxX, +e.x + (+e.w || 40)); maxY = Math.max(maxY, +e.y + (+e.h || 40)); });
+    const W = maxX + 40, H = maxY + 40;
+    SCALE = 0.08; OFFSET_X = -W / 2 * SCALE; OFFSET_Z = -H / 2 * SCALE;
+    return { W, H };
+  }
+
+  function init(_container, _plan, _opts) {
+    dispose();
+    container = _container; plan = _plan; opts = _opts || {};
+    container.innerHTML = '';
+    currentFloor = opts.floor || Object.keys(plan.floors)[0];
+    focusedId = null;
+    computeBounds();
+
+    scene = new THREE.Scene();
+    scene.background = new THREE.Color(COL.bg);
+    scene.fog = new THREE.FogExp2(COL.bg, 0.006);
+
+    camera = new THREE.PerspectiveCamera(45, (container.clientWidth / container.clientHeight) || 1.6, 0.1, 1000);
+    camera.position.set(0, 44, 52);
+
+    renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(container.clientWidth, container.clientHeight);
+    renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.05;
+    container.appendChild(renderer.domElement);
+
+    controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true; controls.dampingFactor = 0.06;
+    controls.maxPolarAngle = Math.PI / 2 - 0.05; controls.minDistance = 5; controls.maxDistance = 130;
+    controls.target.set(0, 2, 0);
+    defaultCam = { pos: camera.position.clone(), target: controls.target.clone() };
+
+    raycaster = new THREE.Raycaster(); mouse = new THREE.Vector2();
+
+    scene.add(new THREE.HemisphereLight(0xffffff, 0xd9cba8, 1.15));
+    const sun = new THREE.DirectionalLight(0xfff3df, 1.6);
+    sun.position.set(32, 46, 22); sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048);
+    sun.shadow.camera.near = 0.5; sun.shadow.camera.far = 160;
+    const d = 50; sun.shadow.camera.left = -d; sun.shadow.camera.right = d; sun.shadow.camera.top = d; sun.shadow.camera.bottom = -d;
+    sun.shadow.bias = -0.0005; scene.add(sun);
+    const fill = new THREE.DirectionalLight(0xbfe4ef, 0.4); fill.position.set(-28, 18, -24); scene.add(fill);
+
+    build();
+    resizeHandler = onResize; window.addEventListener('resize', resizeHandler);
+    renderer.domElement.addEventListener('pointerdown', onPointerDown);
+    renderer.domElement.addEventListener('pointermove', onPointerMove);
+    loop();
+  }
+
+  function clearGroups() {
+    [...tableMeshes, ...elementMeshes, ...floorObjs, ...pins].forEach(m => scene.remove(m));
+    tableMeshes = []; elementMeshes = []; floorObjs = []; waters = []; pins = [];
+  }
+
+  function build() {
+    clearGroups();
+    const b = computeBounds(); const W = b.W * SCALE, H = b.H * SCALE;
+
+    /* Suelo de arena (una sola planta, plano) */
+    const geo = new THREE.BoxGeometry(W, 0.4, H);
+    const plate = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: COL.sand, roughness: 1.0, metalness: 0.0 }));
+    plate.position.set(0, -0.2, 0); plate.receiveShadow = true; scene.add(plate); floorObjs.push(plate);
+    const line = new THREE.LineSegments(new THREE.EdgesGeometry(geo), new THREE.LineBasicMaterial({ color: COL.sandLine }));
+    line.position.copy(plate.position); scene.add(line); floorObjs.push(line);
+
+    /* Mesas / camas de la planta actual */
+    Object.values(plan.tables).forEach(t => {
+      const zone = plan.zones[t.id_zone]; if (zone.floor !== currentFloor) return;
+      const tx = (+t.x * SCALE) + OFFSET_X, tz = (+t.y * SCALE) + OFFSET_Z;
+      const size = 1.2 + (+t.max * 0.05);
+      const g = new THREE.Group(); g.position.set(tx, 0, tz); g.name = 'Table_' + t.id_table;
+      g.userData = { tableId: t.id_table, raw: t, zone, floorName: plan.floors[zone.floor].name };
+
+      const woodMat = new THREE.MeshStandardMaterial({ color: COL.wood, roughness: 0.65, metalness: 0.05 });
+      const cushionMat = new THREE.MeshStandardMaterial({ color: COL.available, roughness: 0.9 });
+      const pillowMat = new THREE.MeshStandardMaterial({ color: COL.pillow, roughness: 0.9 });
+      g.userData.cushionMat = cushionMat;
+
+      if (t.shape === 'cuadrada') {
+        addBox(g, woodMat, size, 0.22, size, 0, 0.11, 0, true);
+        const c = addBox(g, cushionMat, size*0.92, 0.2, size*0.92, 0, 0.32, 0, true); c.name='cushion';
+        addBox(g, pillowMat, size*0.3, 0.1, size*0.18, -size*0.22, 0.36, -size*0.32);
+        addBox(g, pillowMat, size*0.3, 0.1, size*0.18,  size*0.22, 0.36, -size*0.32);
+        const postGeo = new THREE.CylinderGeometry(0.035,0.035,2.1,8); postGeo.translate(0,1.05,0);
+        [-size/2+0.04, size/2-0.04].forEach(x=>[-size/2+0.04,size/2-0.04].forEach(z=>{const p=new THREE.Mesh(postGeo,woodMat);p.position.set(x,0,z);p.castShadow=true;g.add(p);}));
+        /* dosel de lino (toldo beach club) */
+        const canopy = new THREE.Mesh(new THREE.BoxGeometry(size+0.1,0.06,size+0.1), new THREE.MeshStandardMaterial({color:COL.fabric1,roughness:0.9}));
+        canopy.position.y = 2.12; canopy.castShadow = true; g.add(canopy);
+      } else if (t.shape === 'redonda') {
+        const r = size*0.65;
+        const base=new THREE.Mesh(new THREE.CylinderGeometry(r,r,0.22,24),woodMat); base.position.y=0.11; base.castShadow=base.receiveShadow=true; g.add(base);
+        const c=new THREE.Mesh(new THREE.CylinderGeometry(r*0.94,r*0.94,0.18,24),cushionMat); c.name='cushion'; c.position.y=0.31; c.castShadow=true; g.add(c);
+        addBox(g, pillowMat, r*0.45,0.1,r*0.26, -r*0.24,0.35,-r*0.35);
+        addBox(g, pillowMat, r*0.45,0.1,r*0.26,  r*0.24,0.35,-r*0.35);
+      } else if (t.shape === 'alargadav') {
+        const w=size*0.72,l=size*1.5;
+        addBox(g,woodMat,w,0.14,l,0,0.07,0,true);
+        const c=addBox(g,cushionMat,w*0.92,0.14,l*0.94,0,0.21,0,true); c.name='cushion';
+        const head=addBox(g,cushionMat,w*0.92,0.14,l*0.35,0,0.41,-l*0.32); head.rotation.x=-Math.PI/6;
+      } else {
+        const w=size*1.5,l=size*0.72;
+        addBox(g,woodMat,w,0.14,l,0,0.07,0,true);
+        const c=addBox(g,cushionMat,w*0.94,0.14,l*0.92,0,0.21,0,true); c.name='cushion';
+        const head=addBox(g,cushionMat,w*0.35,0.14,l*0.92,-w*0.32,0.41,0); head.rotation.z=Math.PI/6;
+      }
+
+      const ringGeo = new THREE.RingGeometry(size*0.45, size*0.5, 24); ringGeo.rotateX(-Math.PI/2);
+      const halo = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({ color: COL.selected, side: THREE.DoubleSide, transparent: true, opacity: 0.25 }));
+      halo.name='halo'; halo.position.y=0.02; g.add(halo); g.userData.haloMat = halo.material;
+
+      applyStatus(g); scene.add(g); tableMeshes.push(g);
+
+      /* Pin de precio por MESA */
+      if (opts.zonePricing && opts.zonePricing[t.id_zone]) {
+        const sold = opts.getStatus && opts.getStatus(t.id_table) === 'sold';
+        const pin = makeTablePin(sold ? 'Agotada' : money(opts.zonePricing[t.id_zone].prepay), sold);
+        pin.position.set(g.position.x, 2.9, g.position.z); pin.userData = { tableId: t.id_table };
+        scene.add(pin); pins.push(pin);
+      }
+    });
+
+    /* Decoración beach club */
+    Object.values(plan.roomelements || {}).forEach(el => {
+      if (el.floor !== currentFloor) return;
+      const ex = (+el.x * SCALE) + OFFSET_X, ez = (+el.y * SCALE) + OFFSET_Z;
+      const grp = new THREE.Group(); grp.position.set(ex, 0, ez);
+      if (el.shape === 'palm') {
+        const trunkMat=new THREE.MeshStandardMaterial({color:COL.trunk,roughness:0.95}); const leafMat=new THREE.MeshStandardMaterial({color:COL.palmLeaf,roughness:0.6});
+        const tg=new THREE.CylinderGeometry(0.12,0.22,4,10); tg.translate(0,2,0); const trunk=new THREE.Mesh(tg,trunkMat); trunk.castShadow=true; grp.add(trunk);
+        for(let i=0;i<6;i++){const lg=new THREE.BoxGeometry(1.9,0.03,0.6);lg.translate(0.95,0,0);const lf=new THREE.Mesh(lg,leafMat);lf.position.y=4;lf.rotation.y=(i/6)*Math.PI*2;lf.rotation.z=-Math.PI/6.5;lf.castShadow=true;grp.add(lf);}
+      } else if (el.shape.startsWith('umbrella')) {
+        const poleMat=new THREE.MeshStandardMaterial({color:COL.wood,roughness:0.5}); const fabMat=new THREE.MeshStandardMaterial({color:el.shape==='umbrella-1'?COL.fabric1:COL.fabric2,roughness:0.85,side:THREE.DoubleSide});
+        const pg=new THREE.CylinderGeometry(0.06,0.06,4.5,8); pg.translate(0,2.25,0); const pole=new THREE.Mesh(pg,poleMat); pole.castShadow=true; grp.add(pole);
+        const tg=new THREE.ConeGeometry(2.2,1.2,18,1,true); tg.translate(0,4.35,0); const top=new THREE.Mesh(tg,fabMat); top.castShadow=true; grp.add(top);
+      } else if (el.shape === 'pool-v') {
+        const pw=+el.w*SCALE, ph=+el.h*SCALE; grp.position.x+=pw/2; grp.position.z+=ph/2;
+        const border=new THREE.Mesh(new THREE.BoxGeometry(pw,0.6,ph),new THREE.MeshStandardMaterial({color:0xece0c8,roughness:0.8})); border.position.y=0.2; border.receiveShadow=true; grp.add(border);
+        const water=new THREE.Mesh(new THREE.PlaneGeometry(pw-0.5,ph-0.5,24,24),new THREE.MeshStandardMaterial({color:COL.water,transparent:true,opacity:0.88,roughness:0.04,metalness:0.15,emissive:0x2bbdcf,emissiveIntensity:0.28,side:THREE.DoubleSide})); water.rotation.x=-Math.PI/2; water.position.y=0.5; grp.add(water); waters.push(water);
+      } else if (el.shape === 'plant') {
+        const pot=new THREE.Mesh((()=>{const g=new THREE.CylinderGeometry(0.38,0.22,0.8,12);g.translate(0,0.4,0);return g;})(),new THREE.MeshStandardMaterial({color:0xc18a5e,roughness:0.85})); pot.castShadow=true; grp.add(pot);
+        const bush=new THREE.Mesh((()=>{const g=new THREE.DodecahedronGeometry(0.48,1);g.translate(0,1.0,0);return g;})(),new THREE.MeshStandardMaterial({color:0x4aa777,roughness:0.75})); bush.castShadow=true; grp.add(bush);
+      } else if (el.shape === 'other') {
+        const sw=+el.w*SCALE, sh=+el.h*SCALE; grp.position.x+=sw/2; grp.position.z+=sh/2;
+        const deck=new THREE.Mesh(new THREE.BoxGeometry(sw,0.5,sh),new THREE.MeshStandardMaterial({color:COL.stage,roughness:0.75,metalness:0.05})); deck.position.y=0.25; deck.receiveShadow=true; grp.add(deck);
+        const wire=new THREE.LineSegments(new THREE.EdgesGeometry(deck.geometry),new THREE.LineBasicMaterial({color:COL.wood})); wire.position.copy(deck.position); grp.add(wire);
+      }
+      scene.add(grp); elementMeshes.push(grp);
+    });
+  }
+
+  function roundRect(x, rx, ry, w, h, r) { x.beginPath(); x.moveTo(rx+r,ry); x.arcTo(rx+w,ry,rx+w,ry+h,r); x.arcTo(rx+w,ry+h,rx,ry+h,r); x.arcTo(rx,ry+h,rx,ry,r); x.arcTo(rx,ry,rx+w,ry,r); x.closePath(); }
+  function makeTablePin(text, dim) {
+    const c = document.createElement('canvas'); c.width = 240; c.height = 110; const x = c.getContext('2d');
+    x.shadowColor = 'rgba(15,23,42,0.22)'; x.shadowBlur = 10; x.shadowOffsetY = 3;
+    x.fillStyle = '#ffffff'; roundRect(x, 10, 8, 220, 62, 16); x.fill();
+    x.shadowColor = 'transparent';
+    x.strokeStyle = dim ? '#cbd5e1' : '#6366f1'; x.lineWidth = 3; roundRect(x, 10, 8, 220, 62, 16); x.stroke();
+    x.beginPath(); x.moveTo(104, 70); x.lineTo(136, 70); x.lineTo(120, 92); x.closePath(); x.fillStyle = '#ffffff'; x.fill();
+    x.fillStyle = dim ? '#94a3b8' : '#4f46e5'; x.font = '800 30px Inter, sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle';
+    x.fillText(text, 120, 40);
+    const tex = new THREE.CanvasTexture(c); tex.anisotropy = 4;
+    const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false, transparent: true }));
+    sp.scale.set(3.6, 1.65, 1); sp.renderOrder = 999;
+    return sp;
+  }
+  function money(n) { return (Math.round(n)).toLocaleString('es-ES') + ' €'; }
+
+  function addBox(group, mat, w, h, d, x, y, z, shadow) {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat); m.position.set(x, y, z);
+    if (shadow) { m.castShadow = true; m.receiveShadow = true; } group.add(m); return m;
+  }
+
+  function applyStatus(g) {
+    const id = g.userData.tableId;
+    const status = opts.getStatus ? opts.getStatus(id) : 'available';
+    const c = g.userData.cushionMat, h = g.userData.haloMat; if (!c) return;
+    const isFocused = focusedId !== null && String(focusedId) === String(id) && status !== 'sold';
+    if (status === 'sold') { c.color.setHex(COL.sold); c.emissive.setHex(0x000000); c.emissiveIntensity=0; if(h){h.color.setHex(COL.sold);h.opacity=0.12;} }
+    else if (isFocused) { c.color.setHex(COL.selected); c.emissive.setHex(0x4f46e5); c.emissiveIntensity=0.6; if(h){h.color.setHex(COL.selected);h.opacity=0.95;} }
+    else if (status === 'selected') { c.color.setHex(COL.booked); c.emissive.setHex(0x10b981); c.emissiveIntensity=0.3; if(h){h.color.setHex(COL.booked);h.opacity=0.65;} }
+    else { c.color.setHex(COL.available); c.emissive.setHex(0x000000); c.emissiveIntensity=0; if(h){h.color.setHex(COL.selected);h.opacity=0.25;} }
+  }
+
+  function refreshTable(id) { const g = tableMeshes.find(m => String(m.userData.tableId) === String(id)); if (g) applyStatus(g); }
+  function refreshAll() { tableMeshes.forEach(applyStatus); }
+  function setFocused(id) { focusedId = id; refreshAll(); }
+
+  function pickGroup(ev) {
+    const rect = renderer.domElement.getBoundingClientRect();
+    mouse.x = ((ev.clientX - rect.left) / rect.width) * 2 - 1;
+    mouse.y = -((ev.clientY - rect.top) / rect.height) * 2 + 1;
+    raycaster.setFromCamera(mouse, camera);
+    const hits = raycaster.intersectObjects(scene.children, true);
+    for (const hit of hits) { let o = hit.object; if (o.type === 'Sprite') continue; while (o.parent && o.parent !== scene) { if (o.parent.name.startsWith('Table_')) return o.parent; o = o.parent; } if (o.name && o.name.startsWith('Table_')) return o; }
+    return null;
+  }
+
+  function onPointerMove(ev) {
+    const g = pickGroup(ev);
+    if (g !== hovered) {
+      if (hovered) applyStatus(hovered);
+      hovered = g; document.body.style.cursor = g ? 'pointer' : 'default';
+      if (g && opts.getStatus(g.userData.tableId) !== 'sold') {
+        const c = g.userData.cushionMat, h = g.userData.haloMat;
+        c.emissive.setHex(0x6366f1); c.emissiveIntensity = 0.45; if (h) h.opacity = 0.8;
+      }
+    }
+  }
+
+  let downXY = null;
+  function onPointerDown(ev) { downXY = { x: ev.clientX, y: ev.clientY }; window.addEventListener('pointerup', onPointerUp, { once: true }); }
+  function onPointerUp(ev) {
+    if (!downXY) return; const moved = Math.hypot(ev.clientX - downXY.x, ev.clientY - downXY.y); downXY = null;
+    if (moved > 6) return;
+    const g = pickGroup(ev);
+    if (g) { if (opts.onPick && opts.getStatus(g.userData.tableId) !== 'sold') opts.onPick(g.userData.tableId); }
+    else if (opts.onDeselect) opts.onDeselect();
+  }
+
+  function animateCamera(toPos, toTarget, dur) {
+    if (!controls) return;
+    const sP = camera.position.clone(), sT = controls.target.clone(); const t0 = performance.now();
+    controls.enabled = false; cancelAnimationFrame(window._planCam);
+    (function step(now){ const p = Math.min((now - t0) / (dur||700), 1), e = 1 - Math.pow(1 - p, 3);
+      camera.position.lerpVectors(sP, toPos, e); controls.target.lerpVectors(sT, toTarget, e);
+      if (p < 1) window._planCam = requestAnimationFrame(step); else controls.enabled = true;
+    })(t0);
+  }
+
+  function focusTable(id) {
+    const g = tableMeshes.find(m => String(m.userData.tableId) === String(id)); if (!g) return;
+    const target = new THREE.Vector3(); g.getWorldPosition(target); target.y += 0.5;
+    let dir = camera.position.clone().sub(controls.target).normalize();
+    if (Math.abs(dir.x) < 0.01 && Math.abs(dir.z) < 0.01) dir = new THREE.Vector3(0.2, 0.8, 0.55).normalize();
+    animateCamera(target.clone().addScaledVector(dir, 13), target, 700);
+  }
+
+  function focusZone(zoneId) {
+    const ms = tableMeshes.filter(g => String(g.userData.zone.id_zone) === String(zoneId)); if (!ms.length) return;
+    const box = new THREE.Box3(); ms.forEach(g => box.expandByObject(g));
+    const center = box.getCenter(new THREE.Vector3()); const size = box.getSize(new THREE.Vector3());
+    const radius = Math.max(size.x, size.z, 4);
+    let dir = camera.position.clone().sub(controls.target).normalize();
+    if (Math.abs(dir.x) < 0.01 && Math.abs(dir.z) < 0.01) dir = new THREE.Vector3(0.25, 0.8, 0.55).normalize();
+    const dist = radius * 2.0 + 9; const target = center.clone(); target.y += 0.5;
+    animateCamera(target.clone().addScaledVector(dir, dist), target, 750);
+  }
+
+  function resetView() { if (defaultCam) animateCamera(defaultCam.pos.clone(), defaultCam.target.clone(), 700); }
+  function setFloor(fid) { currentFloor = fid; focusedId = null; computeBounds(); build(); resetView(); }
+  function getFloor() { return currentFloor; }
+
+  function loop() {
+    rafId = requestAnimationFrame(loop);
+    const t = Date.now() * 0.001;
+    waters.forEach(w => { const pos = w.geometry.attributes.position; for (let i=0;i<pos.count;i++){const u=pos.getX(i),v=pos.getY(i);pos.setZ(i, Math.sin(u*1.2+t*2.0)*0.06 + Math.cos(v*1.2+t*1.5)*0.06);} pos.needsUpdate = true; });
+    if (controls) controls.update();
+    if (renderer) renderer.render(scene, camera);
+  }
+
+  function onResize() { if (!container || !renderer) return; camera.aspect = container.clientWidth / container.clientHeight; camera.updateProjectionMatrix(); renderer.setSize(container.clientWidth, container.clientHeight); }
+
+  function dispose() {
+    if (rafId) cancelAnimationFrame(rafId); rafId = null;
+    if (resizeHandler) window.removeEventListener('resize', resizeHandler);
+    if (renderer) { renderer.dispose(); if (renderer.domElement && renderer.domElement.parentNode) renderer.domElement.parentNode.removeChild(renderer.domElement); }
+    scene = camera = renderer = controls = null; tableMeshes = []; elementMeshes = []; floorObjs = []; waters = []; pins = []; hovered = null; focusedId = null;
+  }
+
+  return { init, dispose, setFloor, getFloor, refreshTable, refreshAll, setFocused, focusTable, focusZone, resetView, resize: onResize };
+})();
+
+</script>
+<script>
+
+  /* ====================================================================== */
+/* App — listing (calendario/masonry), modal de evento, funnel, carrito    */
+/* ====================================================================== */
+const App = (function () {
+  const state = { event:null, step:1, cart:[], flow:{ stage:'catalog' }, eventsView:'calendar', calMonth:5, calYear:2026 };
+  const FEE = 0.05;
+  const money = n => (Math.round(n)).toLocaleString('es-ES') + ' €';
+  const $ = id => document.getElementById(id);
+
+  function show(viewId) { document.querySelectorAll('.view').forEach(v => v.classList.remove('active')); $(viewId).classList.add('active'); }
+  function toast(msg) { const t = $('toast'); t.textContent = msg; t.style.opacity = '1'; clearTimeout(window._toastT); window._toastT = setTimeout(() => t.style.opacity = '0', 1800); }
+
+  /* ---------------- EVENTS LISTING ---------------- */
+  function goEvents() { PlanRenderer.dispose(); state.event = null; state.cart = []; $('topbar-event').textContent = ''; updateCartBadge(); renderEvents(); show('view-events'); }
+
+  function renderEvents() { renderMasonry(); renderCalendar(); applyEventsView(); }
+
+  function setEventsView(v) { state.eventsView = v; applyEventsView(); }
+  function applyEventsView() {
+    const cal = state.eventsView === 'calendar';
+    $('events-calendar').style.display = cal ? '' : 'none';
+    $('events-masonry').style.display = cal ? 'none' : '';
+    $('vt-calendar').className = 'px-3 py-1.5 text-xs font-semibold rounded-lg transition ' + (cal ? 'bg-white shadow-sm text-brand-600' : 'text-slate-500');
+    $('vt-grid').className = 'px-3 py-1.5 text-xs font-semibold rounded-lg transition ' + (!cal ? 'bg-white shadow-sm text-brand-600' : 'text-slate-500');
+  }
+
+  function eventCardHTML(ev) {
+    const tables = ev.plan ? Object.keys(ev.plan.tables).length : 0;
+    const minGen = Math.min(...ev.generalTickets.map(t => t.price));
+    return `<div class="break-avoid mb-5 text-left rounded-2xl overflow-hidden bg-white border border-slate-200 shadow-card hover:shadow-brand hover:border-brand-300 transition cursor-pointer" onclick="App.openEvent('${ev.id}')">
+      <div class="h-44 relative bg-gradient-to-tr ${ev.accent}">
+        <img src="${ev.flyer}" alt="${ev.name}" class="w-full h-full object-cover" loading="lazy" onerror="this.style.display='none'">
+        <div class="absolute inset-0 bg-gradient-to-t from-black/45 to-transparent"></div>
+        ${ev.plan ? '<span class="absolute top-3 right-3 text-[10px] font-bold bg-black/40 text-white px-2 py-1 rounded-full"><i class="fa-solid fa-cube mr-1"></i>Plano 3D</span>' : '<span class="absolute top-3 right-3 text-[10px] font-bold bg-black/40 text-white px-2 py-1 rounded-full">General</span>'}
+      </div>
+      <div class="p-4">
+        <p class="text-[11px] text-brand-600 font-semibold">${ev.date}</p>
+        <h3 class="font-bold text-slate-900 mt-1 leading-snug">${ev.name}</h3>
+        <p class="text-xs text-slate-400 mt-1"><i class="fa-solid fa-location-dot mr-1"></i>${ev.venue}</p>
+        <p class="text-xs text-slate-500 mt-2">${ev.tagline}</p>
+        <div class="flex items-center justify-between mt-4 pt-3 border-t border-slate-100">
+          <span class="text-xs text-slate-400">${tables ? tables + ' reservados' : 'Solo entradas'}</span>
+          <span class="text-sm font-bold text-slate-900">desde ${money(minGen)}</span>
+        </div>
+      </div>
+    </div>`;
+  }
+
+  function renderMasonry() { $('events-masonry').innerHTML = EVENTS.map(eventCardHTML).join(''); }
+
+  function renderCalendar() {
+    const title = new Date(state.calYear, state.calMonth, 1).toLocaleString('es-ES', { month:'long', year:'numeric' });
+    $('cal-title').textContent = title;
+    const first = new Date(state.calYear, state.calMonth, 1);
+    const startWeekday = (first.getDay() + 6) % 7; // lunes = 0
+    const daysInMonth = new Date(state.calYear, state.calMonth + 1, 0).getDate();
+    const byDay = {};
+    EVENTS.forEach(ev => { const d = new Date(ev.dateISO); if (d.getFullYear() === state.calYear && d.getMonth() === state.calMonth) (byDay[d.getDate()] = byDay[d.getDate()] || []).push(ev); });
+
+    let cells = '';
+    for (let i = 0; i < startWeekday; i++) cells += `<div class="bg-slate-50 min-h-[92px]"></div>`;
+    for (let d = 1; d <= daysInMonth; d++) {
+      const evs = byDay[d] || [];
+      cells += `<div class="bg-white min-h-[92px] p-1.5 ${evs.length?'ring-1 ring-inset ring-brand-100':''}">
+        <div class="text-[11px] font-semibold ${evs.length?'text-brand-600':'text-slate-400'} mb-1">${d}</div>
+        ${evs.map(ev => `<button onclick="App.openEvent('${ev.id}')" class="w-full text-left mb-1 px-1.5 py-1 rounded-md bg-gradient-to-r ${ev.accent} text-white text-[10px] font-semibold leading-tight truncate hover:brightness-105 transition">${ev.name.split(' · ')[0]}</button>`).join('')}
+      </div>`;
+    }
+    const trailing = (7 - ((startWeekday + daysInMonth) % 7)) % 7;
+    for (let i = 0; i < trailing; i++) cells += `<div class="bg-slate-50 min-h-[92px]"></div>`;
+    $('cal-grid').innerHTML = cells;
+  }
+  function calPrev() { state.calMonth--; if (state.calMonth < 0) { state.calMonth = 11; state.calYear--; } renderCalendar(); }
+  function calNext() { state.calMonth++; if (state.calMonth > 11) { state.calMonth = 0; state.calYear++; } renderCalendar(); }
+
+  /* ---------------- EVENT MODAL ---------------- */
+  function openEventModal() {
+    const ev = state.event; if (!ev) return;
+    const flyer = $('em-flyer'); flyer.src = ev.flyer; flyer.alt = ev.name;
+    $('em-flyer-wrap').className = 'relative bg-gradient-to-tr ' + ev.accent + ' min-h-[260px] md:min-h-full';
+    $('em-date').textContent = ev.dateLong || ev.date;
+    $('em-name').textContent = ev.titleBig || ev.name;
+    $('em-tags').innerHTML = (ev.tags || []).map(t => `<span class="inline-flex items-center gap-1.5 bg-slate-100 text-slate-700 text-xs font-semibold px-3 py-1.5 rounded-lg">${t.icon?`<i class="fa-solid ${t.icon} text-slate-400"></i>`:''}${t.label}</span>`).join('');
+    $('em-info').innerHTML = (ev.info || ev.tagline).split('\n').map(p => `<p class="mb-3">${p}</p>`).join('');
+    $('em-venue').textContent = ev.venue;
+    $('em-address').textContent = ev.address || '';
+    $('em-maps').href = ev.mapsUrl || ('https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(ev.address || ev.venue));
+    const m = $('event-modal'); m.classList.remove('hidden'); m.classList.add('flex');
+  }
+  function closeEventModal() { const m = $('event-modal'); m.classList.add('hidden'); m.classList.remove('flex'); }
+
+  /* ---------------- OPEN EVENT / FUNNEL ---------------- */
+  function openEvent(id) {
+    state.event = EVENTS.find(e => e.id === id); state.cart = []; state.flow = { stage:'catalog' };
+    $('topbar-event').textContent = state.event.name;
+    closeEventModal();
+    show('view-funnel'); buildStepper(); goStep(1);
+  }
+
+  function buildStepper() {
+    const steps = ['Entradas', 'Tus datos'];
+    $('stepper').innerHTML = steps.map((s, i) => {
+      const n = i + 1;
+      return `<li class="flex items-center gap-2 md:gap-4"><button onclick="App.goStep(${n})" data-step="${n}" class="flex items-center gap-2"><span class="step-dot w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold border transition">${n}</span><span class="step-label hidden sm:inline text-xs font-semibold transition">${s}</span></button>${n < steps.length ? '<span class="w-5 md:w-10 h-px bg-slate-200"></span>' : ''}</li>`;
+    }).join('');
+  }
+  function updateStepper() {
+    document.querySelectorAll('#stepper [data-step]').forEach(btn => {
+      const n = +btn.dataset.step, dot = btn.querySelector('.step-dot'), label = btn.querySelector('.step-label');
+      if (n === state.step) { dot.className='step-dot w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold border bg-brand-600 border-brand-600 text-white'; dot.textContent=n; label.className='step-label hidden sm:inline text-xs font-semibold text-slate-900'; }
+      else if (n < state.step) { dot.className='step-dot w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold border bg-brand-100 border-brand-500 text-brand-600'; dot.innerHTML='<i class="fa-solid fa-check"></i>'; label.className='step-label hidden sm:inline text-xs font-semibold text-slate-600'; }
+      else { dot.className='step-dot w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold border bg-slate-100 border-slate-200 text-slate-400'; dot.textContent=n; label.className='step-label hidden sm:inline text-xs font-semibold text-slate-400'; }
+    });
+  }
+
+  function goStep(n) {
+    if (n === 2 && cartCount() === 0) { toast('Tu carrito está vacío'); return; }
+    state.step = n;
+    $('step-1').classList.toggle('hidden', n !== 1);
+    $('step-2').classList.toggle('hidden', n !== 2);
+    updateStepper();
+    if (n === 1) enterEntradas();
+    if (n === 2) renderOrderSummary();
+  }
+
+  /* ---------------- STEP 1 ---------------- */
+  function enterEntradas() {
+    const ev = state.event, hasPlan = !!ev.plan;
+    $('plan-area').classList.toggle('hidden', !hasPlan);
+    $('plan-empty').classList.toggle('hidden', hasPlan);
+    renderEventInfoBar();
+    state.flow = { stage:'catalog' };
+    if (hasPlan) {
+      buildFloorTabs();
+      PlanRenderer.init($('plan-canvas'), ev.plan, { getStatus: tableStatus, onPick: onTablePick, onDeselect: onMapDeselect, zonePricing: ev.zonePricing });
+      setTimeout(() => PlanRenderer.resize(), 60);
+    } else { PlanRenderer.dispose(); }
+    renderSidebar(); updateTotals();
+  }
+
+  function renderEventInfoBar() {
+    const ev = state.event;
+    $('event-info-bar').innerHTML = `<div class="flex items-center justify-between gap-3">
+      <div class="min-w-0"><p class="text-sm font-bold text-slate-900 truncate">${ev.name}</p><p class="text-[11px] text-slate-500 truncate"><i class="fa-regular fa-calendar mr-1"></i>${ev.date} · ${ev.venue}</p></div>
+      <span class="shrink-0 text-[11px] font-semibold text-brand-600 bg-brand-50 px-2 py-1 rounded-lg"><i class="fa-solid fa-circle-info mr-1"></i>Detalles</span>
+    </div>`;
+  }
+
+  function buildFloorTabs() {
+    const ev = state.event, wrap = $('plan-floors');
+    const floors = Object.values(ev.plan.floors);
+    wrap.innerHTML = floors.map(f => `<button data-floor="${f.id_floor}" class="floor-tab px-3 py-1.5 text-xs font-semibold rounded-lg transition">${f.name}</button>`).join('');
+    wrap.querySelectorAll('.floor-tab').forEach(btn => btn.onclick = () => { PlanRenderer.setFloor(btn.dataset.floor); markActiveFloor(btn.dataset.floor); App.backToCatalog(); });
+    markActiveFloor(floors[0].id_floor);
+  }
+  function markActiveFloor(fid) { document.querySelectorAll('.floor-tab').forEach(b => b.className = 'floor-tab px-3 py-1.5 text-xs font-semibold rounded-lg transition ' + (b.dataset.floor === fid ? 'bg-brand-600 text-white' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100')); }
+
+  function tableStatus(id) {
+    if (state.event.soldTables.includes(+id)) return 'sold';
+    if (state.cart.some(l => l.kind === 'vip' && String(l.refId) === String(id))) return 'selected';
+    return 'available';
+  }
+  function onTablePick(id) { openTableDetail(id); }
+  function onMapDeselect() { if (state.flow.stage !== 'catalog') backToCatalog(); else PlanRenderer.resetView(); }
+
+  function openTableDetail(id) {
+    const ev = state.event, t = ev.plan.tables[id]; if (!t) return;
+    state.flow = { stage:'detail', kind:'vip', tableId:id, addons:{} };
+    PlanRenderer.setFocused(id); PlanRenderer.focusTable(id);
+    renderSidebar();
+  }
+  function openZone(zoneId) {
+    const fid = state.event.plan.zones[zoneId].floor;
+    if (PlanRenderer.getFloor() !== fid) { PlanRenderer.setFloor(fid); markActiveFloor(fid); }
+    PlanRenderer.setFocused(null); PlanRenderer.focusZone(zoneId); toast('Elige tu mesa en el plano');
+  }
+  function openGeneralDetail(ticketId) { state.flow = { stage:'detail', kind:'general', ticketId, qty:1, addons:{} }; if (state.event.plan) PlanRenderer.setFocused(null); renderSidebar(); }
+
+  function toAddons() { state.flow.stage = 'addons'; renderSidebar(); }
+  function backToCatalog() { state.flow = { stage:'catalog' }; if (state.event.plan) { PlanRenderer.setFocused(null); PlanRenderer.resetView(); } renderSidebar(); updateTotals(); }
+
+  /* ---------------- SIDEBAR ---------------- */
+  function setSidebar(body, footer) {
+    $('sidebar-content').innerHTML = `<div class="flex-1 overflow-y-auto p-4 md:p-5 space-y-5 fade-in">${body}</div><div class="shrink-0 border-t border-slate-200 p-4 bg-slate-50 space-y-2.5">${footer}</div>`;
+  }
+  function renderSidebar() {
+    if (state.flow.stage === 'detail') return renderDetail();
+    if (state.flow.stage === 'addons') return renderAddons();
+    return renderCatalog();
+  }
+
+  function renderCatalog() {
+    const ev = state.event; let body = '';
+    const vipEntries = Object.entries(ev.zonePricing || {});
+    if (ev.plan && vipEntries.length) {
+      body += `<div>
+        <h3 class="text-xs font-bold tracking-widest text-slate-500 uppercase mb-1"><i class="fa-solid fa-crown text-brand-600 mr-1"></i> Reservados VIP</h3>
+        <p class="text-[11px] text-slate-400 mb-2">Toca una zona para enfocarla en el plano y elige tu mesa.</p>
+        <div class="space-y-2">${vipEntries.map(([zid, zp]) => `
+          <button onclick="App.openZone('${zid}')" class="w-full text-left flex items-center justify-between gap-2 bg-white border border-slate-200 hover:border-brand-400 hover:bg-brand-50/40 rounded-xl px-3 py-2.5 transition">
+            <div class="min-w-0"><p class="text-sm font-semibold text-slate-900 truncate">${zp.label}</p><p class="text-[11px] text-slate-400">${ev.plan.zones[zid].name}</p></div>
+            <div class="text-right shrink-0"><p class="text-[10px] text-slate-400">desde</p><p class="num-pill text-sm font-bold text-brand-600">${money(zp.prepay)}</p></div>
+          </button>`).join('')}</div></div>`;
+    }
+    body += `<div>
+      <h3 class="text-xs font-bold tracking-widest text-slate-500 uppercase mb-2"><i class="fa-solid fa-ticket text-brand-600 mr-1"></i> Entradas generales</h3>
+      <div class="space-y-2">${ev.generalTickets.map(t => `
+        <button onclick="App.openGeneralDetail('${t.id}')" class="w-full text-left flex items-center justify-between gap-2 bg-white border border-slate-200 hover:border-brand-400 hover:bg-brand-50/40 rounded-xl px-3 py-2.5 transition">
+          <div class="min-w-0 pr-2"><p class="text-sm font-semibold text-slate-900">${t.name}</p><p class="text-[11px] text-slate-400 truncate">${t.desc}</p></div>
+          <div class="text-right shrink-0"><p class="num-pill text-sm font-bold text-brand-600">${money(t.price)}</p><i class="fa-solid fa-chevron-right text-[10px] text-slate-300"></i></div>
+        </button>`).join('')}</div></div>`;
+    const count = cartCount();
+    const footer = `<div class="flex justify-between text-sm"><span class="text-slate-500">Subtotal (${count} ${count===1?'producto':'productos'})</span><span id="sb-subtotal" class="num-pill font-bold text-slate-900">${money(cartSubtotal())}</span></div>
+      <button onclick="App.goStep(2)" ${count===0?'disabled':''} class="w-full py-3 rounded-xl bg-gradient-to-r from-brand-500 to-accent-500 hover:brightness-105 text-white font-bold text-sm transition disabled:opacity-40 disabled:cursor-not-allowed shadow-brand">Continuar al pago <i class="fa-solid fa-arrow-right ml-1"></i></button>`;
+    setSidebar(body, footer);
+  }
+
+  function renderDetail() {
+    const ev = state.event;
+    if (state.flow.kind === 'vip') {
+      const id = state.flow.tableId, t = ev.plan.tables[id], zp = ev.zonePricing[t.id_zone];
+      const inCart = state.cart.some(l => l.kind === 'vip' && String(l.refId) === String(id));
+      const body = `<button onclick="App.backToCatalog()" class="text-xs text-slate-500 hover:text-slate-900"><i class="fa-solid fa-arrow-left mr-1"></i>Volver al catálogo</button>
+        <div><p class="text-[10px] text-brand-600 font-mono tracking-widest uppercase">${ev.plan.zones[t.id_zone].name} · Mesa #${id}</p>
+          <h2 class="text-2xl font-black text-slate-900 mt-0.5">${zp.label}</h2><p class="text-sm text-slate-500 mt-2">${zp.description}</p></div>
+        <div class="grid grid-cols-2 gap-2 text-xs">
+          ${infoCell('Personas', `${t.min} – ${t.max}`)}${infoCell('Planta', ev.plan.floors[ev.plan.zones[t.id_zone].floor].name)}
+          ${infoCell('Cover charge', money(zp.cover) + ' / pers.')}${infoCell('Min. spend', money(zp.minSpend))}
+          ${infoCell('Prepago (ahora)', money(zp.prepay), true)}${infoCell('Resto en local', money(Math.max(0, zp.minSpend - zp.prepay)))}
+        </div>
+        ${inCart ? '<div class="text-xs text-brand-700 bg-brand-50 border border-brand-200 rounded-lg px-3 py-2"><i class="fa-solid fa-check mr-1"></i>Esta mesa ya está en tu carrito.</div>' : ''}`;
+      const footer = inCart
+        ? `<button onclick="App.removeVip('${id}')" class="w-full py-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-600 hover:bg-rose-100 font-bold text-sm transition">Quitar del carrito</button>`
+        : `<button onclick="App.toAddons()" class="w-full py-3 rounded-xl bg-gradient-to-r from-brand-500 to-accent-500 hover:brightness-105 text-white font-bold text-sm transition shadow-brand">Seleccionar <i class="fa-solid fa-arrow-right ml-1"></i></button>`;
+      setSidebar(body, footer);
+    } else {
+      const t = findGen(state.flow.ticketId), qty = state.flow.qty;
+      const body = `<button onclick="App.backToCatalog()" class="text-xs text-slate-500 hover:text-slate-900"><i class="fa-solid fa-arrow-left mr-1"></i>Volver al catálogo</button>
+        <div><p class="text-[10px] text-brand-600 font-mono tracking-widest uppercase">Entrada general</p>
+          <h2 class="text-2xl font-black text-slate-900 mt-0.5">${t.name}</h2><p class="text-sm text-slate-500 mt-2">${t.desc}</p></div>
+        <div class="grid grid-cols-2 gap-2 text-xs">${infoCell('Precio / entrada', money(t.price), true)}${infoCell('Máx. por compra', t.max)}</div>
+        <div class="flex items-center justify-between bg-white border border-slate-200 rounded-xl px-3 py-3"><span class="text-sm font-semibold text-slate-900">Cantidad</span>${stepperHtml('App.changeDetailQty(-1)','App.changeDetailQty(1)',qty)}</div>`;
+      const footer = `<button onclick="App.toAddons()" class="w-full py-3 rounded-xl bg-gradient-to-r from-brand-500 to-accent-500 hover:brightness-105 text-white font-bold text-sm transition shadow-brand">Siguiente <i class="fa-solid fa-arrow-right ml-1"></i></button>`;
+      setSidebar(body, footer);
+    }
+  }
+
+  function renderAddons() {
+    const ev = state.event, f = state.flow;
+    const itemName = f.kind === 'vip' ? ev.zonePricing[ev.plan.tables[f.tableId].id_zone].label + ' #' + f.tableId : findGen(f.ticketId).name + (f.qty>1?` ×${f.qty}`:'');
+    const list = ev.addons.length ? ev.addons.map(a => {
+      const q = f.addons[a.id] || 0;
+      return `<div class="flex items-center justify-between bg-white border border-slate-200 rounded-xl px-3 py-2.5">
+        <div class="min-w-0 pr-2"><p class="text-sm font-semibold text-slate-900">${a.name}</p><p class="text-[11px] text-slate-400">${a.desc} · ${money(a.price)}</p></div>
+        ${stepperHtml(`App.changeAddonQty('${a.id}',-1)`, `App.changeAddonQty('${a.id}',1)`, q)}</div>`;
+    }).join('') : '<p class="text-sm text-slate-500 bg-white border border-slate-200 rounded-xl px-3 py-3">Este evento no tiene complementos. Puedes añadir el producto directamente.</p>';
+    const body = `<button onclick="App.backToDetail()" class="text-xs text-slate-500 hover:text-slate-900"><i class="fa-solid fa-arrow-left mr-1"></i>Volver a la ficha</button>
+      <div><h2 class="text-xl font-black text-slate-900">Añade complementos</h2><p class="text-sm text-slate-500 mt-1">Para: <span class="text-slate-800 font-semibold">${itemName}</span></p></div>
+      <div class="space-y-2">${list}</div>`;
+    const footer = `<div class="flex justify-between text-sm"><span class="text-slate-500">Total de este producto</span><span class="num-pill font-bold text-slate-900">${money(flowItemTotal())}</span></div>
+      <button onclick="App.addToCart()" class="w-full py-3 rounded-xl bg-gradient-to-r from-brand-500 to-brand-600 hover:brightness-105 text-white font-bold text-sm transition shadow-brand"><i class="fa-solid fa-cart-plus mr-1.5"></i>Añadir al carrito</button>`;
+    setSidebar(body, footer);
+  }
+
+  function infoCell(label, val, hi) { return `<div class="bg-white border border-slate-200 rounded-lg p-2.5"><span class="text-[10px] text-slate-400 block">${label}</span><span class="num-pill font-bold ${hi?'text-brand-600':'text-slate-800'}">${val}</span></div>`; }
+  function stepperHtml(decFn, incFn, qty) {
+    return `<div class="flex items-center gap-1 shrink-0">
+      <button onclick="${decFn}" class="w-8 h-8 rounded-lg bg-slate-100 border border-slate-200 text-slate-600 hover:bg-slate-200 ${qty===0?'opacity-40':''}"><i class="fa-solid fa-minus text-xs"></i></button>
+      <span class="num-pill w-7 text-center text-sm font-bold text-slate-900">${qty}</span>
+      <button onclick="${incFn}" class="w-8 h-8 rounded-lg bg-brand-100 border border-brand-200 text-brand-700 hover:bg-brand-200"><i class="fa-solid fa-plus text-xs"></i></button></div>`;
+  }
+
+  function changeDetailQty(d) { const max = findGen(state.flow.ticketId).max; state.flow.qty = Math.max(1, Math.min(max, state.flow.qty + d)); renderDetail(); }
+  function changeAddonQty(id, d) { const a = findAddon(id); const cur = state.flow.addons[id] || 0; const next = Math.max(0, Math.min(a.max, cur + d)); if (next===0) delete state.flow.addons[id]; else state.flow.addons[id] = next; renderAddons(); }
+  function backToDetail() { state.flow.stage = 'detail'; renderSidebar(); }
+
+  function flowAddonArray() { return Object.entries(state.flow.addons || {}).map(([id, q]) => { const a = findAddon(id); return { id, name:a.name, qty:q, price:a.price }; }); }
+  function flowItemTotal() {
+    const ev = state.event, f = state.flow;
+    const base = f.kind === 'vip' ? ev.zonePricing[ev.plan.tables[f.tableId].id_zone].prepay : findGen(f.ticketId).price * f.qty;
+    return base + flowAddonArray().reduce((s, a) => s + a.price * a.qty, 0);
+  }
+
+  function addToCart() {
+    const ev = state.event, f = state.flow;
+    if (f.kind === 'vip') {
+      const id = f.tableId, zid = ev.plan.tables[id].id_zone, zp = ev.zonePricing[zid];
+      state.cart.push({ uid:uid(), kind:'vip', refId:id, name:`${zp.label} · #${id}`, sub:ev.plan.zones[zid].name, qty:1, unit:zp.prepay, addons:flowAddonArray() });
+      PlanRenderer.refreshTable(id);
+    } else {
+      const t = findGen(f.ticketId);
+      state.cart.push({ uid:uid(), kind:'general', refId:t.id, name:t.name, sub:'Entrada general', qty:f.qty, unit:t.price, addons:flowAddonArray() });
+    }
+    toast('Añadido al carrito'); backToCatalog();
+  }
+
+  function removeVip(id) { state.cart = state.cart.filter(l => !(l.kind==='vip' && String(l.refId)===String(id))); if (state.event.plan) PlanRenderer.refreshTable(id); backToCatalog(); }
+  function removeLine(uidv) { state.cart = state.cart.filter(l => l.uid !== uidv); if (state.event && state.event.plan) PlanRenderer.refreshAll(); updateTotals(); renderDrawer(); if (state.step===2) renderOrderSummary(); if (state.flow.stage==='catalog') renderCatalog(); }
+
+  /* ---------------- TOTALS ---------------- */
+  function lineTotal(l) { return l.unit * l.qty + l.addons.reduce((s, a) => s + a.price * a.qty, 0); }
+  function cartSubtotal() { return state.cart.reduce((s, l) => s + lineTotal(l), 0); }
+  function cartCount() { return state.cart.length; }
+  function ticketUnits() { return state.cart.reduce((s, l) => s + (l.kind==='vip'?1:l.qty) + l.addons.reduce((x,a)=>x+a.qty,0), 0); }
+  function total() { return cartSubtotal() * (1 + FEE); }
+  function findGen(id) { return state.event.generalTickets.find(t => t.id === id); }
+  function findAddon(id) { return state.event.addons.find(a => a.id === id); }
+  function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+  function updateCartBadge() { $('cart-count').textContent = state.event ? ticketUnits() : 0; }
+  function updateTotals() { updateCartBadge(); $('stepper-total').textContent = money(cartSubtotal()); const sb = $('sb-subtotal'); if (sb) sb.textContent = money(cartSubtotal()); renderDrawer(); }
+
+  function summaryLines() {
+    const rows = [];
+    state.cart.forEach(l => {
+      rows.push({ name:(l.qty>1?l.qty+'× ':'')+l.name, sub:l.sub, price:l.unit*l.qty, head:true });
+      l.addons.forEach(a => rows.push({ name:'+ '+(a.qty>1?a.qty+'× ':'')+a.name, sub:'Complemento', price:a.price*a.qty }));
+    });
+    return rows;
+  }
+  function renderOrderSummary() {
+    const rows = summaryLines();
+    $('order-summary').innerHTML = rows.length ? rows.map(r => `<div class="flex justify-between gap-3 ${r.head?'':'pl-3'}"><span class="${r.head?'text-slate-700':'text-slate-500'}">${r.name}<br><span class="text-[11px] text-slate-400">${r.sub}</span></span><span class="num-pill ${r.head?'text-slate-900 font-semibold':'text-slate-500'} whitespace-nowrap">${money(r.price)}</span></div>`).join('') : '<p class="text-slate-400 text-sm">Carrito vacío.</p>';
+    $('os-subtotal').textContent = money(cartSubtotal()); $('os-fee').textContent = money(cartSubtotal() * FEE); $('os-total').textContent = money(total()); $('pay-total').textContent = ' · ' + money(total());
+  }
+
+  /* ---------------- DRAWER ---------------- */
+  function openCart() { renderDrawer(); $('cart-overlay').classList.remove('opacity-0', 'pointer-events-none'); $('cart-drawer').classList.remove('translate-x-full'); }
+  function closeCart() { $('cart-overlay').classList.add('opacity-0', 'pointer-events-none'); $('cart-drawer').classList.add('translate-x-full'); }
+  function renderDrawer() {
+    const box = $('drawer-items');
+    if (!state.event || state.cart.length === 0) { box.innerHTML = '<p class="text-slate-400 text-sm py-10 text-center">Tu carrito está vacío.</p>'; $('drawer-total').textContent = money(0); $('drawer-checkout').disabled = true; $('drawer-checkout').classList.add('opacity-40'); return; }
+    $('drawer-checkout').disabled = false; $('drawer-checkout').classList.remove('opacity-40');
+    box.innerHTML = state.cart.map(l => `<div class="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5">
+        <div class="flex justify-between gap-2"><div class="min-w-0"><p class="text-sm font-semibold text-slate-900">${l.qty>1?l.qty+'× ':''}${l.name}</p><p class="text-[11px] text-slate-400">${l.sub}</p></div>
+          <div class="flex items-center gap-2 shrink-0"><span class="num-pill text-slate-900 font-bold">${money(lineTotal(l))}</span>
+            <button onclick="App.removeLine('${l.uid}')" class="w-6 h-6 rounded-md hover:bg-rose-100 text-slate-400 hover:text-rose-500"><i class="fa-solid fa-trash text-xs"></i></button></div></div>
+        ${l.addons.length ? '<div class="mt-1.5 pl-1 space-y-0.5">'+l.addons.map(a=>`<p class="text-[11px] text-slate-400">+ ${a.qty>1?a.qty+'× ':''}${a.name} <span class="num-pill">${money(a.price*a.qty)}</span></p>`).join('')+'</div>' : ''}</div>`).join('');
+    $('drawer-total').textContent = money(total());
+  }
+
+  /* ---------------- PLACE ORDER ---------------- */
+  function placeOrder() {
+    const f = $('customer-form'), req = ['firstName', 'lastName', 'email', 'phone'];
+    const ok = req.every(n => f[n].value.trim() !== '') && f.terms.checked && /\S+@\S+\.\S+/.test(f.email.value);
+    $('cf-error').classList.toggle('hidden', ok);
+    if (!ok) return;
+    if (cartCount() === 0) { goStep(1); return; }
+    const locator = 'CE-' + Math.random().toString(36).slice(2, 8).toUpperCase();
+    $('conf-id').textContent = locator; $('conf-email').textContent = f.email.value; $('conf-total').textContent = money(total());
+    $('conf-summary').innerHTML = summaryLines().map(r => `<div class="flex justify-between gap-3 ${r.head?'':'pl-3'}"><span class="${r.head?'text-slate-700':'text-slate-500'}">${r.name}</span><span class="num-pill ${r.head?'text-slate-900 font-semibold':'text-slate-500'}">${money(r.price)}</span></div>`).join('');
+    closeCart(); show('view-confirmation');
+  }
+
+  function init() {
+    const earliest = EVENTS.map(e => new Date(e.dateISO)).sort((a,b)=>a-b)[0];
+    state.calMonth = earliest.getMonth(); state.calYear = earliest.getFullYear();
+    renderEvents();
+    setTimeout(() => { const l = $('loader'); l.style.opacity = '0'; setTimeout(() => l.remove(), 500); }, 700);
+  }
+
+  return { init, goEvents, setEventsView, calPrev, calNext, openEvent, openEventModal, closeEventModal, goStep,
+           openZone, openGeneralDetail, toAddons, backToDetail, backToCatalog, changeDetailQty, changeAddonQty,
+           addToCart, removeVip, removeLine, openCart, closeCart, placeOrder };
+})();
+
+window.addEventListener('load', App.init);
+
+</script>
+</body>
+</html>
